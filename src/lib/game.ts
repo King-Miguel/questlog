@@ -32,7 +32,6 @@ export type NewQuestInput = {
 
 export const RANKS: Rank[] = ['D', 'C', 'B', 'A', 'S'];
 
-/** XP awarded for clearing a quest, mirrored from public.xp_for_rank() in Postgres. */
 export const XP_BY_RANK: Record<Rank, number> = {
   D: 10,
   C: 25,
@@ -49,11 +48,6 @@ export const RANK_HINT: Record<Rank, string> = {
   S: 'Milestone',
 };
 
-/**
- * Total XP needed to be *at* a given level.
- * Level 1 starts at 0 XP. Each level costs 50 XP more than the last.
- * Level 2 = 100, Level 3 = 250, Level 4 = 450, Level 5 = 700, Level 6 = 1000.
- */
 export function xpToReachLevel(level: number): number {
   const n = Math.max(0, level - 1);
   return 100 * n + 25 * n * (n - 1);
@@ -114,7 +108,6 @@ export function levelProgress(totalXp: number): LevelProgress {
   };
 }
 
-/** Local calendar day as YYYY-MM-DD, so streaks follow the user's own clock. */
 export function dayKey(date: Date): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -139,11 +132,7 @@ function completedDaySet(completedAts: Array<string | null>): Set<string> {
   return days;
 }
 
-/**
- * Consecutive days with at least one cleared quest, ending today.
- * A day that is still in progress does not break the streak: if nothing is
- * cleared yet today, the chain is measured up to yesterday instead.
- */
+// Nothing cleared yet today falls back to yesterday, so an unfinished day does not break the chain.
 export function currentStreak(completedAts: Array<string | null>, now: Date = new Date()): number {
   const days = completedDaySet(completedAts);
   if (days.size === 0) return 0;
@@ -203,7 +192,6 @@ const DUE_SORT_WEIGHT: Record<DueState, number> = {
   none: 5,
 };
 
-/** Open quests first: overdue, then due today, then the rest, newest last. */
 export function sortQuestList(quests: Quest[], now: Date = new Date()): Quest[] {
   return [...quests].sort((a, b) => {
     if (a.status !== b.status) return a.status === 'open' ? -1 : 1;

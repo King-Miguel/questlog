@@ -12,17 +12,11 @@ function browserStorage(): Storage | null {
     if (typeof window === 'undefined') return null;
     return window.localStorage ?? null;
   } catch {
-    // Safari private mode and some embedded webviews block localStorage.
     return null;
   }
 }
 
-/**
- * AsyncStorage is the right call on native, but it throws when the app is
- * rendered outside a browser (server rendering, static export). On web we use
- * localStorage directly and degrade to a no-op when it is unavailable, so the
- * same code runs everywhere without a crash.
- */
+// AsyncStorage throws outside a browser, so web uses localStorage with a safe fallback.
 export const authStorage: StorageAdapter =
   Platform.OS === 'web'
     ? {

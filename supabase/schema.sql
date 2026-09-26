@@ -1,16 +1,7 @@
--- ============================================================================
--- QuestLog schema
--- Run this once in Supabase Dashboard > SQL Editor > New query > Run.
--- Safe to re-run: every object is created with IF NOT EXISTS / OR REPLACE.
--- ============================================================================
+-- QuestLog schema. Paste into Supabase SQL Editor and run. Safe to re-run.
 
 create extension if not exists pgcrypto;
 
--- ---------------------------------------------------------------------------
--- XP curve
--- D = 10, C = 25, B = 50, A = 100, S = 250
--- Lives in the database so the client can never inflate XP by editing a row.
--- ---------------------------------------------------------------------------
 create or replace function public.xp_for_rank(rank text)
 returns integer
 language sql
@@ -26,10 +17,6 @@ as $$
   end;
 $$;
 
--- ---------------------------------------------------------------------------
--- profiles
--- One row per auth user. Created automatically by the trigger below.
--- ---------------------------------------------------------------------------
 create table if not exists public.profiles (
   id           uuid primary key references auth.users (id) on delete cascade,
   display_name text,
@@ -41,10 +28,6 @@ create table if not exists public.profiles (
   )
 );
 
--- ---------------------------------------------------------------------------
--- quests
--- A real life task. Completing it is what awards XP.
--- ---------------------------------------------------------------------------
 create table if not exists public.quests (
   id           uuid primary key default gen_random_uuid(),
   user_id      uuid not null references auth.users (id) on delete cascade,
@@ -67,9 +50,6 @@ create index if not exists quests_user_status_idx on public.quests (user_id, sta
 create index if not exists quests_user_completed_idx on public.quests (user_id, completed_at desc);
 create index if not exists quests_user_due_idx on public.quests (user_id, due_date);
 
--- ---------------------------------------------------------------------------
--- updated_at bookkeeping
--- ---------------------------------------------------------------------------
 create or replace function public.touch_updated_at()
 returns trigger
 language plpgsql
@@ -90,10 +70,7 @@ create trigger quests_touch_updated_at
   before update on public.quests
   for each row execute function public.touch_updated_at();
 
--- ---------------------------------------------------------------------------
--- Award / revoke XP whenever a quest flips between open and done.
--- Reopening a quest takes its XP back, so totals always match reality.
--- ---------------------------------------------------------------------------
+-- Awards XP on complete and takes it back on reopen, so the client cannot inflate totals.
 create or replace function public.apply_quest_progress()
 returns trigger
 language plpgsql
@@ -119,9 +96,6 @@ create trigger quests_apply_progress
   before insert or update on public.quests
   for each row execute function public.apply_quest_progress();
 
--- ---------------------------------------------------------------------------
--- Give every new signup a profile row.
--- ---------------------------------------------------------------------------
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
@@ -147,9 +121,6 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
 
--- ---------------------------------------------------------------------------
--- Row Level Security: you can only ever touch your own rows.
--- ---------------------------------------------------------------------------
 alter table public.profiles enable row level security;
 alter table public.quests enable row level security;
 

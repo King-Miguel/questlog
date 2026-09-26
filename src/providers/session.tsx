@@ -72,8 +72,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
       });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      // Only state updates here. Calling back into Supabase from this callback
-      // can deadlock the auth lock, so profile loading happens in an effect.
+      // Keep this synchronous: calling Supabase here can deadlock the auth lock.
       setSession(nextSession);
     });
 
