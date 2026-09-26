@@ -20,10 +20,6 @@ export async function fetchProfile(userId: string): Promise<Profile | null> {
   return (data as Profile | null) ?? null;
 }
 
-/**
- * Safety net: if the signup trigger ever fails to create the profile row,
- * the app creates it on first load instead of showing a broken profile tab.
- */
 export async function ensureProfile(userId: string, fallbackName?: string | null): Promise<Profile> {
   const existing = await fetchProfile(userId);
   if (existing) return existing;

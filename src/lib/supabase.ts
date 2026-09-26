@@ -6,8 +6,7 @@ import { authStorage } from './storage';
 
 const url = (process.env.EXPO_PUBLIC_SUPABASE_URL ?? '').trim();
 
-// Supabase renamed the public key: older projects show an anon key, newer ones
-// show a publishable key. Accept either so setup cannot go wrong.
+// Older projects issue an anon key, newer ones a publishable key. Accept either.
 const publicKey = (
   process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ??
   process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??

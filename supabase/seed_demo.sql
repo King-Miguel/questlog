@@ -1,16 +1,6 @@
--- ============================================================================
--- QuestLog demo data
---
--- Run this AFTER you have created a demo user with the email below.
--- Easiest way: Dashboard > Authentication > Users > Add user > Create new user.
---   email:    demo@questlog.app
---   password: pick one, then put it in .env as EXPO_PUBLIC_DEMO_PASSWORD
---   tick "Auto Confirm User" so the account can log in immediately
---
--- This script wipes the demo account's quests and rebuilds a realistic save
--- file: a 7 day streak, level 4, a few open quests and one overdue quest.
--- It only ever touches the demo account, so it is safe to re-run.
--- ============================================================================
+-- Rebuilds the demo account with a 7 day streak and level 4.
+-- Run it after creating demo@questlog.app in Authentication > Users.
+-- Only touches that one account, so it is safe to re-run.
 
 do $$
 declare
@@ -38,10 +28,6 @@ begin
 
   delete from public.quests where user_id = demo_id;
 
-  -- ---------------------------------------------------------------------
-  -- Completed quests. One or more per day for the last 7 days gives the
-  -- demo account a live streak. The older entries add XP for the level.
-  -- ---------------------------------------------------------------------
   insert into public.quests (user_id, title, difficulty, status, completed_at, notes)
   values
     (demo_id, 'Review data structures notes',        'C', 'done', now(),                            null),
@@ -59,9 +45,6 @@ begin
     (demo_id, 'Set up Supabase project',             'B', 'done', now() - interval '12 days',       null),
     (demo_id, 'Pick final project stack',            'C', 'done', now() - interval '14 days',       null);
 
-  -- ---------------------------------------------------------------------
-  -- Open quests, including one overdue and two due today.
-  -- ---------------------------------------------------------------------
   insert into public.quests (user_id, title, difficulty, status, due_date, notes)
   values
     (demo_id, 'Submit defense manuscript draft',    'S', 'open', current_date - 2, 'Chapter 1 to 3 only'),
