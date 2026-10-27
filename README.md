@@ -119,8 +119,46 @@ The repository includes `vercel.json`, which runs `npx expo export --platform we
 
 After that, adding a `?email=` style link is unnecessary: the login screen has a one tap demo button whenever `EXPO_PUBLIC_DEMO_EMAIL` and `EXPO_PUBLIC_DEMO_PASSWORD` are set.
 
+## AI quest planner
+
+`Quest Scribe` turns one vague goal into 3 to 6 concrete quests. The model runs
+behind a Supabase Edge Function, so the API key never enters the app bundle.
+Every suggestion is validated, clamped to the real rank values, and shown in a
+review checklist before anything is written to the database.
+
+See `docs/AI_SETUP.md` for the Gemini key, the SQL migration, and the Dashboard
+deploy steps. No CLI and no Docker are required.
+
+## Troubleshooting
+
+**"permission denied for table quests" or "profiles"**
+
+RLS policies filter rows, but they do not grant table access. If the Supabase
+default privileges did not apply to your project, the `authenticated` role has
+nothing to grant against. Paste `supabase/fix_permissions.sql` into the SQL
+Editor and run it. It is safe to re-run and ends with a verification query where
+every column should read `true`. `supabase/diagnose.sql` shows the current state
+first. `supabase/schema.sql` now contains the same grants for fresh setups.
+
+**The demo button is missing or fails**
+
+- Both `EXPO_PUBLIC_DEMO_EMAIL` and `EXPO_PUBLIC_DEMO_PASSWORD` must be set, or
+  the button is hidden on purpose.
+- The password must match the demo user in Supabase Auth. Change it in
+  **Authentication > Users**, never by editing `auth.users` with plain SQL.
+- Turn off **Confirm email** under **Authentication > Sign In / Providers**.
+- Expo reads env vars at build time. Restart with `npm run tunnel`, which
+  includes `--clear`, after any `.env` edit.
+
+**Expo Go says "Something went wrong"**
+
+`expo start` without `--tunnel` uses a LAN URL that the phone often cannot
+reach. Use `npm run tunnel`, wait for the tunnel URL, then scan. For a browser
+check with no phone involved, run `npm run web`.
+
 ## Roadmap
 
+- Wire the Quest Scribe review UI and acceptance-rate stats
 - Avatar upload to Supabase Storage
 - Push notification when a daily quest is still open
 - Realtime sync between phone and web

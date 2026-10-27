@@ -124,6 +124,20 @@ create trigger on_auth_user_created
 alter table public.profiles enable row level security;
 alter table public.quests enable row level security;
 
+-- RLS filters rows, it does not grant access to the table itself.
+-- Without these grants the API returns "permission denied for table quests".
+grant usage on schema public to anon, authenticated, service_role;
+grant select, insert, update, delete on public.profiles to anon, authenticated;
+grant select, insert, update, delete on public.quests to anon, authenticated;
+grant all on public.profiles to service_role;
+grant all on public.quests to service_role;
+grant execute on all functions in schema public to anon, authenticated, service_role;
+
+alter default privileges in schema public
+  grant select, insert, update, delete on tables to anon, authenticated;
+alter default privileges in schema public
+  grant all on tables to service_role;
+
 drop policy if exists "profiles_select_own" on public.profiles;
 create policy "profiles_select_own" on public.profiles
   for select using (auth.uid() = id);
