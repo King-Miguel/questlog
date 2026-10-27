@@ -4,16 +4,21 @@ import { createClient } from '@supabase/supabase-js';
 
 import { authStorage } from './storage';
 
-const url = (process.env.EXPO_PUBLIC_SUPABASE_URL ?? '').trim();
+export const supabaseUrl = (process.env.EXPO_PUBLIC_SUPABASE_URL ?? '').trim();
 
 // Older projects issue an anon key, newer ones a publishable key. Accept either.
-const publicKey = (
-  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ??
-  process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
-  ''
-).trim();
+// Pick the first NON-EMPTY value: an empty env var is still a defined string,
+// so plain ?? would stop here and ignore a perfectly good publishable key.
+export const supabaseKey =
+  [
+    process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
+    process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+  ]
+    .map((value) => (value ?? '').trim())
+    .find((value) => value.length > 0) ?? '';
 
-export const isSupabaseConfigured = url.startsWith('https://') && publicKey.length > 20;
+export const isSupabaseConfigured =
+  supabaseUrl.startsWith('https://') && supabaseKey.length > 20;
 
 if (!isSupabaseConfigured && __DEV__) {
   console.warn(
@@ -22,8 +27,8 @@ if (!isSupabaseConfigured && __DEV__) {
 }
 
 export const supabase = createClient(
-  isSupabaseConfigured ? url : 'https://placeholder.supabase.co',
-  isSupabaseConfigured ? publicKey : 'placeholder-key-not-configured',
+  isSupabaseConfigured ? supabaseUrl : 'https://placeholder.supabase.co',
+  isSupabaseConfigured ? supabaseKey : 'placeholder-key-not-configured',
   {
     auth: {
       storage: authStorage,

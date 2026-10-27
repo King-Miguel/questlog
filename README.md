@@ -142,13 +142,45 @@ first. `supabase/schema.sql` now contains the same grants for fresh setups.
 
 **The demo button is missing or fails**
 
+First find out whether the problem is Supabase or the app. In PowerShell:
+
+```
+curl.exe -X POST "https://YOUR_PROJECT_REF.supabase.co/auth/v1/token?grant_type=password" -H "apikey: YOUR_ANON_KEY" -H "Content-Type: application/json" -d '{"email":"demo@questlog.app","password":"YOUR_DEMO_PASSWORD"}'
+```
+
+An `access_token` means the credentials are fine and the app has stale bundled
+env values. An `invalid_grant` means Supabase rejected them.
+
 - Both `EXPO_PUBLIC_DEMO_EMAIL` and `EXPO_PUBLIC_DEMO_PASSWORD` must be set, or
-  the button is hidden on purpose.
-- The password must match the demo user in Supabase Auth. Change it in
-  **Authentication > Users**, never by editing `auth.users` with plain SQL.
-- Turn off **Confirm email** under **Authentication > Sign In / Providers**.
-- Expo reads env vars at build time. Restart with `npm run tunnel`, which
-  includes `--clear`, after any `.env` edit.
+  the button is hidden on purpose. In dev builds it also appears if you type
+  both into the Setup check panel.
+- All `EXPO_PUBLIC_*` values must come from the **same** Supabase project. Run
+  `supabase/check_demo_user.sql` in the SQL Editor of the project your `.env`
+  points at. Zero rows means you created the user somewhere else.
+- Expo bakes env vars in at build time. After any `.env` edit run
+  `npm run web:clean` or `npm run tunnel`, both of which pass `--clear`. A plain
+  `npm run web` can keep serving cached values.
+- Turn off **Confirm email** under **Authentication > Sign In / Providers**, or
+  recreate the user with **Auto Confirm User** ticked.
+- Never set `encrypted_password` to plain text. If the Dashboard will not let
+  you change the password, use `supabase/reset_demo_password.sql`, which writes
+  a real bcrypt hash and confirms the email.
+
+**The app signs me in automatically as a user I deleted**
+
+That is a stale saved session. Starting the app now validates the persisted JWT
+against Supabase and clears it if the user no longer exists. You can also force
+it with **Setup check > Clear saved session** on the login screen. Deleting and
+recreating a user gives it a new ID, so old sessions and old quest rows no
+longer belong to it. Re-run `supabase/seed_demo.sql` afterwards.
+
+**Setup check panel**
+
+In dev builds, the login screen has a **Setup check** panel. It shows the exact
+project host, the key type, the bundled demo password length, and the saved
+session. It lets you type demo credentials at runtime, test them directly
+against Supabase with the raw error, and clear the saved session. It never
+renders in a production build.
 
 **Expo Go says "Something went wrong"**
 

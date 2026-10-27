@@ -29,6 +29,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
+    "web:clean": "expo start --web --clear",
     "tunnel": "expo start --tunnel --clear",
     "typecheck": "tsc --noEmit",
     "build:web": "expo export --platform web"

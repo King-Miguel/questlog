@@ -11,6 +11,7 @@ import {
 
 import { describeAuthError, ensureProfile, updateProfile } from '@/lib/api';
 import type { Profile } from '@/lib/game';
+import { clearAuthStorage } from '@/lib/storage';
 import { DEMO_EMAIL, DEMO_PASSWORD, hasDemoAccount, isSupabaseConfigured, supabase } from '@/lib/supabase';
 
 export type AuthResult = {
@@ -24,10 +25,12 @@ type SessionValue = {
   profile: Profile | null;
   profileLoading: boolean;
   profileError: string | null;
+  lastAuthError: string | null;
   signIn: (email: string, password: string) => Promise<AuthResult>;
   signUp: (email: string, password: string, displayName: string) => Promise<AuthResult>;
-  signInWithDemo: () => Promise<AuthResult>;
+  signInWithDemo: (email?: string, password?: string) => Promise<AuthResult>;
   signOut: () => Promise<void>;
+  clearSavedSession: () => Promise<void>;
   saveDisplayName: (name: string) => Promise<AuthResult>;
   reloadProfile: () => Promise<void>;
   demoAvailable: boolean;
@@ -41,12 +44,37 @@ export function useSession(): SessionValue {
   return value;
 }
 
+async function hardResetSession(): Promise<void> {
+  try {
+    await supabase.auth.signOut({ scope: 'local' });
+  } catch {
+    // A dead refresh token makes the server call fail. Clear local state anyway.
+  }
+  await clearAuthStorage();
+}
+
+// Only treat a real auth rejection as a dead session. A network outage must
+// not silently sign someone out while they are offline.
+function isAuthRejection(error: { status?: number; message?: string } | null): boolean {
+  if (!error) return false;
+  const status = error.status ?? 0;
+  if ([400, 401, 403, 404, 422].includes(status)) return true;
+  const message = (error.message ?? '').toLowerCase();
+  return (
+    message.includes('invalid') ||
+    message.includes('not found') ||
+    message.includes('expired') ||
+    message.includes('revoked')
+  );
+}
+
 export function SessionProvider({ children }: PropsWithChildren) {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
+  const [lastAuthError, setLastAuthError] = useState<string | null>(null);
 
   const userId = session?.user?.id ?? null;
 
@@ -58,23 +86,35 @@ export function SessionProvider({ children }: PropsWithChildren) {
 
     let active = true;
 
-    supabase.auth
-      .getSession()
-      .then(({ data }) => {
-        if (!active) return;
-        setSession(data.session ?? null);
-      })
-      .catch(() => {
-        if (active) setProfileError('Could not read your saved session.');
-      })
-      .finally(() => {
-        if (active) setIsLoading(false);
-      });
-
     const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       // Keep this synchronous: calling Supabase here can deadlock the auth lock.
       setSession(nextSession);
     });
+
+    void (async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (!active) return;
+        const candidate = data.session ?? null;
+
+        if (candidate) {
+          const { error } = await supabase.auth.getUser();
+          if (!active) return;
+          if (isAuthRejection(error)) {
+            // Saved JWT belongs to a deleted user or a revoked refresh token.
+            await hardResetSession();
+            if (active) setSession(null);
+            return;
+          }
+        }
+
+        if (active) setSession(candidate);
+      } catch {
+        if (active) setProfileError('Could not read your saved session.');
+      } finally {
+        if (active) setIsLoading(false);
+      }
+    })();
 
     return () => {
       active = false;
@@ -105,15 +145,21 @@ export function SessionProvider({ children }: PropsWithChildren) {
   }, [reloadProfile]);
 
   const signIn = useCallback(async (email: string, password: string): Promise<AuthResult> => {
+    setLastAuthError(null);
     try {
       const { error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
       });
-      if (error) return { error: describeAuthError(error.message) };
+      if (error) {
+        setLastAuthError(error.message);
+        return { error: describeAuthError(error.message) };
+      }
       return { error: null };
     } catch (error) {
-      return { error: error instanceof Error ? error.message : 'Sign in failed.' };
+      const message = error instanceof Error ? error.message : 'Sign in failed.';
+      setLastAuthError(message);
+      return { error: message };
     }
   }, []);
 
@@ -135,13 +181,25 @@ export function SessionProvider({ children }: PropsWithChildren) {
     [],
   );
 
-  const signInWithDemo = useCallback(async (): Promise<AuthResult> => {
-    return signIn(DEMO_EMAIL, DEMO_PASSWORD);
-  }, [signIn]);
+  const signInWithDemo = useCallback(
+    async (email?: string, password?: string): Promise<AuthResult> => {
+      return signIn(email ?? DEMO_EMAIL, password ?? DEMO_PASSWORD);
+    },
+    [signIn],
+  );
 
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut();
+    await hardResetSession();
     setProfile(null);
+    setSession(null);
+  }, []);
+
+  const clearSavedSession = useCallback(async () => {
+    await hardResetSession();
+    setProfile(null);
+    setProfileError(null);
+    setLastAuthError(null);
+    setSession(null);
   }, []);
 
   const saveDisplayName = useCallback(
@@ -168,10 +226,12 @@ export function SessionProvider({ children }: PropsWithChildren) {
       profile,
       profileLoading,
       profileError,
+      lastAuthError,
       signIn,
       signUp,
       signInWithDemo,
       signOut,
+      clearSavedSession,
       saveDisplayName,
       reloadProfile,
       demoAvailable: hasDemoAccount,
@@ -182,10 +242,12 @@ export function SessionProvider({ children }: PropsWithChildren) {
       profile,
       profileLoading,
       profileError,
+      lastAuthError,
       signIn,
       signUp,
       signInWithDemo,
       signOut,
+      clearSavedSession,
       saveDisplayName,
       reloadProfile,
     ],
