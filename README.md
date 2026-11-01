@@ -190,7 +190,6 @@ check with no phone involved, run `npm run web`.
 
 ## Roadmap
 
-- Wire the Quest Scribe review UI and acceptance-rate stats
 - Avatar upload to Supabase Storage
 - Push notification when a daily quest is still open
 - Realtime sync between phone and web

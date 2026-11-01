@@ -1,8 +1,9 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { PlayerPanel, RankRow, StatTile } from '@/components/game-ui';
 import { LoadingScreen, Panel, Screen, SectionTitle } from '@/components/ui';
+import { fetchAiInsights, type AiInsights } from '@/lib/api';
 import { RANKS, RANK_HINT } from '@/lib/game';
 import { palette, spacing, text } from '@/lib/theme';
 import { useQuests } from '@/providers/quests';
@@ -11,6 +12,22 @@ import { useSession } from '@/providers/session';
 export default function StatsScreen() {
   const { quests, stats, status } = useQuests();
   const { profile } = useSession();
+  const [aiInsights, setAiInsights] = useState<AiInsights | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void fetchAiInsights()
+      .then((insights) => {
+        if (active) setAiInsights(insights);
+      })
+      .catch(() => {
+        // The metric stays hidden until the optional AI migration is installed.
+        if (active) setAiInsights(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [quests.length]);
 
   const memberSince = useMemo(() => {
     if (!profile?.created_at) return null;
@@ -71,6 +88,15 @@ export default function StatsScreen() {
           caption={`${totalLogged} logged`}
           color={palette.purple}
         />
+        {aiInsights && aiInsights.plans > 0 ? (
+          <StatTile
+            icon="sparkles"
+            label="AI kept"
+            value={`${Math.round(aiInsights.acceptanceRate * 100)}%`}
+            caption={`${aiInsights.accepted} of ${aiInsights.suggested} accepted`}
+            color={palette.gold}
+          />
+        ) : null}
         <StatTile
           icon="alert-circle"
           label="Overdue"

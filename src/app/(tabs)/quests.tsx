@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { QuestCard } from '@/components/game-ui';
+import { QuestScribeReview } from '@/components/quest-scribe';
 import {
   Button,
   Chip,
@@ -15,6 +16,7 @@ import {
   SectionTitle,
   TextField,
 } from '@/components/ui';
+import { generateQuestPlan, type QuestPlan, type QuestPlanSuggestion } from '@/lib/api';
 import { RANKS, RANK_HINT, XP_BY_RANK, dayKey, sortQuestList, type Quest, type Rank } from '@/lib/game';
 import { palette, rankColors, radius, spacing, text } from '@/lib/theme';
 import { useQuests } from '@/providers/quests';
@@ -37,15 +39,23 @@ function dueDateFromDays(days: number | null): string | null {
 }
 
 export default function QuestsScreen() {
-  const { quests, stats, status, error, addQuest, toggleQuest, deleteQuest } = useQuests();
+  const { quests, stats, status, error, addQuest, addQuestLine, toggleQuest, deleteQuest } = useQuests();
 
   const [formOpen, setFormOpen] = useState(false);
+  const [scribeOpen, setScribeOpen] = useState(false);
   const [title, setTitle] = useState('');
+  const [scribeGoal, setScribeGoal] = useState('');
+  const [scribeHorizon, setScribeHorizon] = useState(21);
   const [rank, setRank] = useState<Rank>('C');
   const [dueDays, setDueDays] = useState<number | null>(null);
   const [filter, setFilter] = useState<Filter>('active');
   const [formError, setFormError] = useState<string | null>(null);
+  const [scribeError, setScribeError] = useState<string | null>(null);
+  const [reviewError, setReviewError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [scribePending, setScribePending] = useState(false);
+  const [acceptingScribe, setAcceptingScribe] = useState(false);
+  const [reviewPlan, setReviewPlan] = useState<QuestPlan | null>(null);
   const [toDelete, setToDelete] = useState<Quest | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
@@ -64,6 +74,59 @@ export default function QuestsScreen() {
     }),
     [quests],
   );
+
+  const generateScribePlan = async () => {
+    setScribeError(null);
+    const cleanGoal = scribeGoal.trim();
+    if (cleanGoal.length < 4) {
+      setScribeError('Describe your goal in a few words.');
+      return;
+    }
+    if (cleanGoal.length > 300) {
+      setScribeError('Keep the goal under 300 characters.');
+      return;
+    }
+
+    setScribePending(true);
+    try {
+      const plan = await generateQuestPlan(cleanGoal, scribeHorizon);
+      setReviewError(null);
+      setReviewPlan(plan);
+      setScribeOpen(false);
+    } catch (scribeFailure) {
+      setScribeError(scribeFailure instanceof Error ? scribeFailure.message : 'Could not generate a questline.');
+    } finally {
+      setScribePending(false);
+    }
+  };
+
+  const acceptScribePlan = async (suggestions: QuestPlanSuggestion[]) => {
+    if (!reviewPlan) return;
+    setReviewError(null);
+    setAcceptingScribe(true);
+
+    const result = await addQuestLine(
+      suggestions.map((suggestion) => ({
+        title: suggestion.title,
+        notes: suggestion.notes,
+        difficulty: suggestion.difficulty,
+        due_date: dueDateFromDays(suggestion.due_in_days),
+        ai_generated: true,
+        ai_plan_id: reviewPlan.planId,
+      })),
+    );
+
+    setAcceptingScribe(false);
+    if (result.error) {
+      setReviewError(result.error);
+      return;
+    }
+
+    setReviewPlan(null);
+    setReviewError(null);
+    setScribeGoal('');
+    setFilter('active');
+  };
 
   const submit = async () => {
     setFormError(null);
@@ -112,20 +175,77 @@ export default function QuestsScreen() {
           <Text style={text.h1}>{counts.active} active</Text>
           <Text style={text.faint}>{counts.done} cleared all time</Text>
         </View>
-        <Button
-          label={formOpen ? 'Close' : 'New quest'}
-          icon={formOpen ? 'close' : 'add'}
-          variant={formOpen ? 'secondary' : 'primary'}
-          size="sm"
-          onPress={() => {
-            setFormOpen((open) => !open);
-            setFormError(null);
-          }}
-        />
+        <View style={styles.headerActions}>
+          <Button
+            label={scribeOpen ? 'Close' : 'Quest Scribe'}
+            icon={scribeOpen ? 'close' : 'sparkles-outline'}
+            variant={scribeOpen ? 'secondary' : 'ghost'}
+            size="sm"
+            onPress={() => {
+              setScribeOpen((open) => !open);
+              setFormOpen(false);
+              setScribeError(null);
+            }}
+          />
+          <Button
+            label={formOpen ? 'Close' : 'New quest'}
+            icon={formOpen ? 'close' : 'add'}
+            variant={formOpen ? 'secondary' : 'primary'}
+            size="sm"
+            onPress={() => {
+              setFormOpen((open) => !open);
+              setScribeOpen(false);
+              setFormError(null);
+            }}
+          />
+        </View>
       </View>
 
       {error ? <InlineNote message={error} /> : null}
       {deleteError ? <InlineNote message={deleteError} /> : null}
+
+      {scribeOpen ? (
+        <Panel tone="gold" style={styles.form}>
+          <View style={styles.scribeHeading}>
+            <Ionicons name="sparkles" size={18} color={palette.gold} />
+            <Text style={text.label}>Quest Scribe</Text>
+          </View>
+          <Text style={text.muted}>
+            Give Quest Scribe one goal. It will suggest small, actionable quests for you to review.
+          </Text>
+          <TextField
+            label="What are you working toward?"
+            value={scribeGoal}
+            onChangeText={setScribeGoal}
+            placeholder="Prepare for my capstone defense"
+            maxLength={300}
+            multiline
+            numberOfLines={3}
+            hint="Nothing is saved until you approve the suggestions."
+          />
+          <View style={styles.fieldBlock}>
+            <Text style={text.label}>Time horizon</Text>
+            <View style={styles.chipRow}>
+              {[7, 21, 30].map((days) => (
+                <Chip
+                  key={days}
+                  label={`${days} days`}
+                  active={scribeHorizon === days}
+                  onPress={() => setScribeHorizon(days)}
+                />
+              ))}
+            </View>
+          </View>
+          {scribeError ? <InlineNote message={scribeError} /> : null}
+          <Button
+            label="Generate questline"
+            icon="sparkles-outline"
+            onPress={() => void generateScribePlan()}
+            loading={scribePending}
+            fullWidth
+          />
+        </Panel>
+      ) : null}
 
       {formOpen ? (
         <Panel tone="soft" style={styles.form}>
@@ -247,6 +367,22 @@ export default function QuestsScreen() {
         )}
       </View>
 
+      {reviewPlan ? (
+        <QuestScribeReview
+          visible
+          goal={scribeGoal}
+          plan={reviewPlan}
+          error={reviewError}
+          accepting={acceptingScribe}
+          onClose={() => {
+            if (acceptingScribe) return;
+            setReviewPlan(null);
+            setReviewError(null);
+          }}
+          onAccept={(suggestions) => void acceptScribePlan(suggestions)}
+        />
+      ) : null}
+
       <ConfirmDialog
         visible={toDelete !== null}
         title="Delete this quest?"
@@ -266,7 +402,9 @@ export default function QuestsScreen() {
 
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.md },
+  headerActions: { alignItems: 'flex-end', gap: spacing.xs },
   form: { gap: spacing.lg },
+  scribeHeading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   fieldBlock: { gap: spacing.sm },
   rankRow: { flexDirection: 'row', gap: spacing.md },
   rankOption: { alignItems: 'center', gap: spacing.xs },

@@ -13,6 +13,8 @@ export type Quest = {
   completed_at: string | null;
   created_at: string;
   updated_at: string;
+  ai_generated?: boolean;
+  ai_plan_id?: string | null;
 };
 
 export type Profile = {
@@ -28,6 +30,8 @@ export type NewQuestInput = {
   difficulty: Rank;
   due_date: string | null;
   notes?: string | null;
+  ai_generated?: boolean;
+  ai_plan_id?: string | null;
 };
 
 export const RANKS: Rank[] = ['D', 'C', 'B', 'A', 'S'];

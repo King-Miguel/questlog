@@ -99,8 +99,14 @@ rate is the count of quests with a given plan ID divided by that plan's
 `suggested` value. That gives you a real result: how often users kept an AI
 suggestion, and how often they edited or discarded it.
 
-## What is not built yet
+## App integration
 
-The app-side review dialog and the acceptance-rate tile on the Stats screen are
-the next slice. Until then the function is fully testable from the Dashboard and
-the app works exactly as before.
+The app has a Quest Scribe panel on the Quest board. It sends the goal to the
+function, shows a review checklist, and inserts only the suggestions the user
+accepts. The Stats screen shows an AI kept percentage after at least one plan
+has been logged. If the migration is missing, that optional metric stays
+hidden and the rest of the app continues to work.
+
+After deploying the migration and function, run `npm run web:clean` so the app
+uses the current bundle, then sign in and test Quest Scribe with a goal such as
+`Prepare for my capstone defense in three weeks`.

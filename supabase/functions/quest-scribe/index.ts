@@ -13,6 +13,7 @@ type PlannedQuest = {
 
 const RANKS: Rank[] = ['D', 'C', 'B', 'A', 'S'];
 const DAILY_CAP = 8;
+const MIN_QUESTS = 3;
 const MAX_QUESTS = 6;
 
 const CORS: Record<string, string> = {
@@ -212,8 +213,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return fail('The planner returned an unreadable answer. Please try again.', 502);
   }
 
-  if (quests.length === 0) {
-    return fail('The planner could not break that goal down. Try a more specific goal.', 502);
+  if (quests.length < MIN_QUESTS) {
+    return fail('The planner could not make three useful quests. Try a more specific goal.', 502);
   }
 
   const planId = crypto.randomUUID();

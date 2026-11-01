@@ -9,7 +9,7 @@ import {
   type PropsWithChildren,
 } from 'react';
 
-import { fetchQuests, insertQuest, removeQuest, updateQuestStatus } from '@/lib/api';
+import { fetchQuests, insertQuest, insertQuests, removeQuest, updateQuestStatus } from '@/lib/api';
 import { XP_BY_RANK, gameStats, type GameStats, type NewQuestInput, type Quest } from '@/lib/game';
 import { useSession } from '@/providers/session';
 
@@ -26,6 +26,7 @@ type QuestsValue = {
   clearNotice: () => void;
   refresh: () => Promise<void>;
   addQuest: (input: NewQuestInput) => Promise<ActionResult>;
+  addQuestLine: (inputs: NewQuestInput[]) => Promise<ActionResult>;
   toggleQuest: (quest: Quest) => Promise<ActionResult>;
   deleteQuest: (quest: Quest) => Promise<ActionResult>;
 };
@@ -101,6 +102,23 @@ export function QuestsProvider({ children }: PropsWithChildren) {
     [userId, flashNotice],
   );
 
+  const addQuestLine = useCallback(
+    async (inputs: NewQuestInput[]): Promise<ActionResult> => {
+      if (!userId) return { error: 'You are not signed in.' };
+      if (inputs.length === 0) return { error: 'Choose at least one suggested quest.' };
+
+      try {
+        const created = await insertQuests(userId, inputs);
+        setQuests((previous) => [...created, ...previous]);
+        flashNotice(`${created.length} quests accepted from Quest Scribe`);
+        return { error: null };
+      } catch (addError) {
+        return { error: messageOf(addError, 'Could not accept that questline.') };
+      }
+    },
+    [userId, flashNotice],
+  );
+
   const toggleQuest = useCallback(
     async (quest: Quest): Promise<ActionResult> => {
       const nextStatus = quest.status === 'done' ? 'open' : 'done';
@@ -155,10 +173,11 @@ export function QuestsProvider({ children }: PropsWithChildren) {
       clearNotice: () => setNotice(null),
       refresh,
       addQuest,
+      addQuestLine,
       toggleQuest,
       deleteQuest,
     }),
-    [quests, stats, status, error, notice, refresh, addQuest, toggleQuest, deleteQuest],
+    [quests, stats, status, error, notice, refresh, addQuest, addQuestLine, toggleQuest, deleteQuest],
   );
 
   return <QuestsContext.Provider value={value}>{children}</QuestsContext.Provider>;
