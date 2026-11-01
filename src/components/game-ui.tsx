@@ -37,10 +37,15 @@ export function RankChip({ rank, size = 'md' }: { rank: Rank; size?: 'sm' | 'md'
 }
 
 export function LevelBadge({ level, size = 58 }: { level: number; size?: number }) {
+  const valueFontSize = size * (level >= 100 ? 0.27 : level >= 10 ? 0.31 : 0.36);
+  const valueLineHeight = Math.max(12, size * 0.4);
+
   return (
     <View style={[styles.levelBadge, { width: size, height: size, borderRadius: size / 2 }]}>
-      <Text style={styles.levelBadgeLabel}>LV</Text>
-      <Text style={[styles.levelBadgeValue, { fontSize: size * 0.36 }]}>{level}</Text>
+      <Text style={[styles.levelBadgeLabel, { lineHeight: Math.max(10, size * 0.2) }]}>LV</Text>
+      <Text style={[styles.levelBadgeValue, { fontSize: valueFontSize, lineHeight: valueLineHeight }]}>
+        {level}
+      </Text>
     </View>
   );
 }
