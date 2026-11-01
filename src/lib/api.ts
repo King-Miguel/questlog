@@ -230,6 +230,16 @@ export async function generateQuestPlan(goal: string, horizonDays: number): Prom
     if (functionError.status === 502) {
       throw new Error('The planner could not make a clean questline. Try a more specific goal.');
     }
+    const lowerMessage = functionError.message.toLowerCase();
+    if (
+      lowerMessage.includes('failed to send a request') ||
+      lowerMessage.includes('failed to fetch') ||
+      lowerMessage.includes('network')
+    ) {
+      throw new Error(
+        'Quest Scribe could not reach its planner. Deploy the quest-scribe Edge Function in Supabase, then try again.',
+      );
+    }
     throw new Error(functionError.message || 'The AI planner is unavailable right now.');
   }
 

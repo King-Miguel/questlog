@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { QuestCard } from '@/components/game-ui';
-import { QuestScribeReview } from '@/components/quest-scribe';
+import { QuestScribeDrawer, QuestScribeReview } from '@/components/quest-scribe';
 import {
   Button,
   Chip,
@@ -175,77 +175,49 @@ export default function QuestsScreen() {
           <Text style={text.h1}>{counts.active} active</Text>
           <Text style={text.faint}>{counts.done} cleared all time</Text>
         </View>
-        <View style={styles.headerActions}>
-          <Button
-            label={scribeOpen ? 'Close' : 'Quest Scribe'}
-            icon={scribeOpen ? 'close' : 'sparkles-outline'}
-            variant={scribeOpen ? 'secondary' : 'ghost'}
-            size="sm"
-            onPress={() => {
-              setScribeOpen((open) => !open);
-              setFormOpen(false);
-              setScribeError(null);
-            }}
-          />
-          <Button
-            label={formOpen ? 'Close' : 'New quest'}
-            icon={formOpen ? 'close' : 'add'}
-            variant={formOpen ? 'secondary' : 'primary'}
-            size="sm"
-            onPress={() => {
-              setFormOpen((open) => !open);
-              setScribeOpen(false);
-              setFormError(null);
-            }}
-          />
-        </View>
+        <Button
+          label={formOpen ? 'Close' : 'New quest'}
+          icon={formOpen ? 'close' : 'add'}
+          variant={formOpen ? 'secondary' : 'primary'}
+          size="sm"
+          onPress={() => {
+            setFormOpen((open) => !open);
+            setScribeOpen(false);
+            setFormError(null);
+          }}
+        />
       </View>
 
       {error ? <InlineNote message={error} /> : null}
       {deleteError ? <InlineNote message={deleteError} /> : null}
 
-      {scribeOpen ? (
-        <Panel tone="gold" style={styles.form}>
-          <View style={styles.scribeHeading}>
-            <Ionicons name="sparkles" size={18} color={palette.gold} />
-            <Text style={text.label}>Quest Scribe</Text>
-          </View>
-          <Text style={text.muted}>
-            Give Quest Scribe one goal. It will suggest small, actionable quests for you to review.
-          </Text>
-          <TextField
-            label="What are you working toward?"
-            value={scribeGoal}
-            onChangeText={setScribeGoal}
-            placeholder="Prepare for my capstone defense"
-            maxLength={300}
-            multiline
-            numberOfLines={3}
-            hint="Nothing is saved until you approve the suggestions."
-          />
-          <View style={styles.fieldBlock}>
-            <Text style={text.label}>Time horizon</Text>
-            <View style={styles.chipRow}>
-              {[7, 21, 30].map((days) => (
-                <Chip
-                  key={days}
-                  label={`${days} days`}
-                  active={scribeHorizon === days}
-                  onPress={() => setScribeHorizon(days)}
-                />
-              ))}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Open Quest Scribe AI questline planner"
+        onPress={() => {
+          setScribeOpen(true);
+          setFormOpen(false);
+          setScribeError(null);
+        }}
+        style={({ pressed }) => [styles.scribeCard, pressed && styles.scribeCardPressed]}
+      >
+        <View style={styles.scribeCardIcon}>
+          <Ionicons name="sparkles" size={25} color={palette.gold} />
+        </View>
+        <View style={styles.scribeCardBody}>
+          <View style={styles.scribeCardEyebrow}>
+            <Text style={styles.scribeCardLabel}>AI QUESTLINE PLANNER</Text>
+            <View style={styles.aiPill}>
+              <Text style={styles.aiPillText}>AI</Text>
             </View>
           </View>
-          {scribeError ? <InlineNote message={scribeError} /> : null}
-          <Button
-            label="Generate questline"
-            icon="sparkles-outline"
-            onPress={() => void generateScribePlan()}
-            loading={scribePending}
-            fullWidth
-          />
-        </Panel>
-      ) : null}
+          <Text style={styles.scribeCardTitle}>Turn one goal into your next quests</Text>
+          <Text style={styles.scribeCardText}>Describe a goal, review the plan, and accept only what belongs on your board.</Text>
+        </View>
+        <View style={styles.scribeCardArrow}>
+          <Ionicons name="arrow-forward" size={20} color={palette.gold} />
+        </View>
+      </Pressable>
 
       {formOpen ? (
         <Panel tone="soft" style={styles.form}>
@@ -367,6 +339,21 @@ export default function QuestsScreen() {
         )}
       </View>
 
+      <QuestScribeDrawer
+        visible={scribeOpen}
+        goal={scribeGoal}
+        horizonDays={scribeHorizon}
+        error={scribeError}
+        pending={scribePending}
+        onClose={() => setScribeOpen(false)}
+        onGoalChange={(value) => {
+          setScribeGoal(value);
+          if (scribeError) setScribeError(null);
+        }}
+        onHorizonChange={setScribeHorizon}
+        onGenerate={() => void generateScribePlan()}
+      />
+
       {reviewPlan ? (
         <QuestScribeReview
           visible
@@ -402,9 +389,36 @@ export default function QuestsScreen() {
 
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.md },
-  headerActions: { alignItems: 'flex-end', gap: spacing.xs },
   form: { gap: spacing.lg },
-  scribeHeading: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  scribeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.lg,
+    backgroundColor: palette.goldWash,
+    borderWidth: 1,
+    borderColor: palette.goldDeep,
+    borderRadius: radius.lg,
+  },
+  scribeCardPressed: { opacity: 0.78 },
+  scribeCardIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: palette.panel,
+    borderWidth: 1,
+    borderColor: palette.goldDeep,
+  },
+  scribeCardBody: { flex: 1, gap: spacing.xs },
+  scribeCardEyebrow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  scribeCardLabel: { color: palette.gold, fontSize: 10, fontWeight: '800', letterSpacing: 1.3 },
+  aiPill: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: radius.pill, backgroundColor: palette.gold },
+  aiPillText: { color: palette.onGold, fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
+  scribeCardTitle: { color: palette.text, fontSize: 16, fontWeight: '800', lineHeight: 21 },
+  scribeCardText: { color: palette.textMuted, fontSize: 12, lineHeight: 17 },
+  scribeCardArrow: { padding: spacing.sm },
   fieldBlock: { gap: spacing.sm },
   rankRow: { flexDirection: 'row', gap: spacing.md },
   rankOption: { alignItems: 'center', gap: spacing.xs },
